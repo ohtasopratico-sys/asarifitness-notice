@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 外部依存ゼロ・どのPCおよびクラウド（Render/Fly.io等）でも即座に動く
-完全統合 Web通知＆データ管理 サーバー (500エラー完全保護・最新7件表示版)
+完全統合 Web通知＆データ管理 サーバー (重複統合・最新7件保持保証版)
 """
 
 import http.server
@@ -23,7 +23,6 @@ DB_FILE = os.path.join('/tmp', 'push_system.db') if os.path.exists('/tmp') else 
 ALL_MESSAGES = []
 
 def init_db():
-    global ALL_MESSAGES
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
@@ -45,10 +44,6 @@ def init_db():
             )
         ''')
         conn.commit()
-        cursor.execute("SELECT id, title, body, sent_at FROM messages ORDER BY id DESC LIMIT 20")
-        rows = cursor.fetchall()
-        if rows:
-            ALL_MESSAGES = [{"id": int(r[0]), "title": str(r[1]), "body": str(r[2]), "sent_at": str(r[3])} for r in rows]
         conn.close()
     except Exception as e:
         print(f"Init DB Note: {e}")
@@ -191,18 +186,25 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
 
     def handle_get_messages(self):
         global ALL_MESSAGES
-        safe_list = []
+        # DBから読み込んで既存のメモリ配列とIDで重複なく統合
         try:
-            for item in ALL_MESSAGES[:7]:
-                safe_list.append({
-                    "id": int(item.get("id", 0)),
-                    "title": str(item.get("title", "")),
-                    "body": str(item.get("body", "")),
-                    "sent_at": str(item.get("sent_at", ""))
-                })
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, title, body, sent_at FROM messages ORDER BY id DESC LIMIT 20")
+            rows = cursor.fetchall()
+            conn.close()
+            if rows:
+                db_msgs = [{"id": int(r[0]), "title": str(r[1]), "body": str(r[2]), "sent_at": str(r[3])} for r in rows]
+                existing_ids = {m["id"] for m in ALL_MESSAGES}
+                for db_m in db_msgs:
+                    if db_m["id"] not in existing_ids:
+                        ALL_MESSAGES.append(db_m)
+                # ID降順（新しい順）に並び替え
+                ALL_MESSAGES.sort(key=lambda x: x["id"], reverse=True)
         except Exception:
-            safe_list = []
-        self.send_json_response({"messages": safe_list})
+            pass
+
+        self.send_json_response({"messages": ALL_MESSAGES[:7]})
 
     def handle_subscribe(self, data):
         self.send_json_response({"message": "登録しました"}, status=201)
