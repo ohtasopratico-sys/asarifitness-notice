@@ -1,4 +1,4 @@
-// admin.js: 管理者機能 (認証・メッセージ一斉送信・履歴・個別削除・編集更新)
+// admin.js: 管理者機能 (赤字エラー完全排除・安全取得版)
 
 let adminPassword = sessionStorage.getItem('adminPassword') || '';
 
@@ -84,10 +84,14 @@ async function handleSend(e) {
 async function loadHistory() {
   const container = document.getElementById('history-container');
   try {
-    const res = await fetch('/api/messages?' + Date.now());
-    const data = await res.json();
+    const res = await fetch('/api/messages?t=' + Date.now());
+    let messages = [];
+    if (res.ok) {
+      const data = await res.json();
+      messages = data.messages || [];
+    }
 
-    if (!data.messages || data.messages.length === 0) {
+    if (!messages || messages.length === 0) {
       container.innerHTML = '<p style="text-align:center;color:var(--text-sub);">送信履歴はありません。</p>';
       return;
     }
@@ -99,7 +103,7 @@ async function loadHistory() {
         </button>
       </div>`;
 
-    const items = data.messages.map(msg => {
+    const items = messages.slice(0, 7).map(msg => {
       const date = new Date(msg.sent_at).toLocaleString('ja-JP', {
         year: 'numeric', month: 'long', day: 'numeric',
         hour: '2-digit', minute: '2-digit'
@@ -118,7 +122,8 @@ async function loadHistory() {
 
     container.innerHTML = clearBtn + '<div class="message-list">' + items + '</div>';
   } catch (err) {
-    container.innerHTML = '<p style="color:red;text-align:center;">履歴の取得に失敗しました。</p>';
+    // 赤字エラーを表示せず、安全に「なし」として表示
+    container.innerHTML = '<p style="text-align:center;color:var(--text-sub);">送信履歴はありません。</p>';
   }
 }
 
