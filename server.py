@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-外部依存ゼロ・どのPC（Mac/Windows/Linux）でも標準Pythonで即座に動く
-自前Web通知＆SQLiteデータベース サーバー
-serveo.net SSHトンネル連携で登録不要・固定URL公開に対応
+外部依存ゼロ・どのPCおよびクラウド（Render/Fly.io等）でも即座に動く
+完全統合 Web通知＆SQLite サーバー
 """
 
 import http.server
@@ -13,21 +12,15 @@ import json
 import sqlite3
 import os
 import sys
-import webbrowser
-import subprocess
-import threading
-import time
 from datetime import datetime
 
-PORT = 3000
-DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "push_system.db")
-PUBLIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "public")
+# 環境変数 PORT（Renderが指定）があればそれを使用、なければ3000
+PORT = int(os.environ.get('PORT', 3000))
 
-# ============================================================
-# ★ お店の名前を半角英数で入力してください（URLになります）
-# 例: "yamadashoten" → https://yamadashoten.serveo.net
-# ============================================================
-STORE_NAME = "asarifitness"
+# データベース保存先
+DATA_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_FILE = os.path.join(DATA_DIR, 'push_system.db')
+PUBLIC_DIR = os.path.join(DATA_DIR, 'public')
 
 # --- SQLite データベース初期化 ---
 def init_db():
@@ -52,61 +45,6 @@ def init_db():
     ''')
     conn.commit()
     conn.close()
-    print("✅ SQLite データベースを初期化しました。")
-
-# --- localhost.run SSHトンネルをバックグラウンドで起動 ---
-def start_tunnel():
-    print(f"\n🌐 インターネット公開URLを準備中... (しばらくお待ちください)")
-
-    cmd = [
-        "ssh",
-        "-o", "StrictHostKeyChecking=no",
-        "-o", "ServerAliveInterval=30",
-        "-o", "ExitOnForwardFailure=no",
-        "-R", f"80:localhost:{PORT}",
-        "localhost.run"
-    ]
-
-    def run_ssh():
-        while True:
-            try:
-                proc = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True
-                )
-                for line in proc.stdout:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    # URLが発行されたら見やすく表示
-                    if "https://" in line and ".localhost.run" in line:
-                        import re
-                        match = re.search(r'https://[\w\-]+\.localhost\.run', line)
-                        if match:
-                            url = match.group(0)
-                            print("\n" + "=" * 54)
-                            print("🌐 インターネット公開URL（固定）が発行されました！")
-                            print()
-                            print(f"  📱 お客様用（自宅からもOK）: {url}")
-                            print(f"  ⚙️  管理者用（自宅からもOK）: {url}/admin.html")
-                            print()
-                            print("  ✅ このURLはこのPCのSSHキーに紐づいた固定URLです。")
-                            print("  📋 QRコードにしてチラシ・店頭に掲示してください。")
-                            print("=" * 54 + "\n")
-                    else:
-                        print(f"[tunnel] {line}")
-                proc.wait()
-            except FileNotFoundError:
-                print("⚠️  SSH が見つかりません。Windows の場合は OpenSSH をインストールしてください。")
-                break
-            except Exception as e:
-                print(f"[tunnel] 再接続します... ({e})")
-                time.sleep(5)
-
-    t = threading.Thread(target=run_ssh, daemon=True)
-    t.start()
 
 # --- HTTPリクエストハンドラー ---
 class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -114,17 +52,15 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=PUBLIC_DIR, **kwargs)
 
     def log_message(self, format, *args):
-        # リクエストログを簡潔に表示
-        print(f"  [{datetime.now().strftime('%H:%M:%S')}] {self.command} {self.path}")
+        pass
 
     def end_headers(self):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type, x-admin-password')
-        # 静的ファイルは1時間キャッシュ、APIはキャッシュなし
         if self.path.startswith('/api/'):
             self.send_header('Cache-Control', 'no-cache, no-store')
-        elif any(self.path.endswith(ext) for ext in ('.css', '.js', '.jpg', '.png', '.ico')):
+        elif any(self.path.endswith(ext) for ext in ('.css', '.js', '.jpg', '.png', '.ico', '.jpg')):
             self.send_header('Cache-Control', 'public, max-age=3600')
         else:
             self.send_header('Cache-Control', 'no-cache')
@@ -135,7 +71,7 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        if self.path == '/api/messages':
+        if self.path == '/api/messages' or self.path.startswith('/api/messages?'):
             self.handle_get_messages()
             return
         if self.path == '/api/vapid-public-key':
@@ -180,17 +116,14 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_json_response({"error": "認証エラー"}, status=401)
             return
 
-        # 全履歴削除
         if self.path == '/api/admin/messages':
             conn = sqlite3.connect(DB_FILE)
             conn.execute("DELETE FROM messages")
             conn.commit()
             conn.close()
-            print("🗑️ 全メッセージ履歴を削除しました")
             self.send_json_response({"message": "全履歴を削除しました"})
             return
 
-        # 個別メッセージ削除: /api/admin/messages/{id}
         m = _re.match(r'^/api/admin/messages/(\d+)$', self.path)
         if m:
             msg_id = int(m.group(1))
@@ -198,7 +131,6 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
             conn.execute("DELETE FROM messages WHERE id = ?", (msg_id,))
             conn.commit()
             conn.close()
-            print(f"🗑️ メッセージID {msg_id} を削除しました")
             self.send_json_response({"message": "削除しました"})
             return
 
@@ -245,7 +177,6 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
         cursor.execute("SELECT COUNT(*) FROM subscriptions")
         count = cursor.fetchone()[0]
         conn.close()
-        print(f"📢 配信: 「{title}」 対象: {count}件")
         self.send_json_response({"message": "送信完了", "successCount": max(count, 1), "failureCount": 0})
 
     def send_json_response(self, data, status=200):
@@ -257,47 +188,13 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
 # --- メイン実行 ---
 def main():
     init_db()
-
-    # serveo.net トンネルを起動
-    start_tunnel()
-
-    # ローカルサーバーを起動
     socketserver.ThreadingTCPServer.allow_reuse_address = True
+    httpd = socketserver.ThreadingTCPServer(("0.0.0.0", PORT), PushSystemRequestHandler)
+    print(f"🚀 サーバー起動: PORT {PORT}")
     try:
-      httpd = socketserver.ThreadingTCPServer(("", PORT), PushSystemRequestHandler)
-    except OSError:
-      print(f"\n❌ ポート {PORT} はすでに使用中です。")
-      print("   別のサーバーが起動していないか確認してください。")
-      print("   または server.py の PORT の数値を変更してください。")
-      sys.exit(1)
-    with httpd:
-        public_url  = f"https://{STORE_NAME}.serveo.net"
-        admin_url   = f"https://{STORE_NAME}.serveo.net/admin.html"
-        local_url   = f"http://localhost:{PORT}"
-
-        print("=" * 54)
-        print("🎉 通知システム起動完了！")
-        print()
-        print(f"  📱 お客様用（自宅からもOK）: {public_url}")
-        print(f"  ⚙️  管理者用（自宅からもOK）: {admin_url}")
-        print()
-        print(f"  💻 ローカルのみ: {local_url}")
-        print()
-        print("  ✅ このウィンドウを開いている間、お客様はどこからでも")
-        print("     上記の固定URLにアクセスできます。")
-        print()
-        print("  🔴 終了するには Ctrl + C を押してください。")
-        print("=" * 54)
-
-        # 管理者用ブラウザを自動オープン（少し待ってから開く）
-        time.sleep(1)
-        webbrowser.open(local_url)
-
-        try:
-            httpd.serve_forever()
-        except KeyboardInterrupt:
-            print("\n✅ サーバーを停止しました。")
-            sys.exit(0)
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()
