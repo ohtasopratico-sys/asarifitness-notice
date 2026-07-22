@@ -1,4 +1,4 @@
-// admin.js: 管理者機能 (認証・メッセージ一斉送信・履歴・履歴削除)
+// admin.js: 管理者機能 (認証・メッセージ一斉送信・履歴・個別削除・編集更新)
 
 let adminPassword = sessionStorage.getItem('adminPassword') || '';
 
@@ -10,7 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('send-form').addEventListener('submit', handleSend);
 });
 
-// ログイン処理
 async function handleLogin() {
   const passwordInput = document.getElementById('admin-password').value;
   if (!passwordInput) {
@@ -20,7 +19,6 @@ async function handleLogin() {
   await verifyLogin(passwordInput);
 }
 
-// パスワード検証
 async function verifyLogin(password) {
   document.getElementById('login-alert').style.display = 'none';
   try {
@@ -45,7 +43,6 @@ async function verifyLogin(password) {
   }
 }
 
-// 一斉送信処理
 async function handleSend(e) {
   e.preventDefault();
   const title = document.getElementById('msg-title').value.trim();
@@ -69,7 +66,7 @@ async function handleSend(e) {
     });
     const data = await res.json();
     if (res.ok) {
-      showAlert('send-alert', `🎉 送信完了！(成功: ${data.successCount}件, 失敗: ${data.failureCount}件)`, 'success');
+      showAlert('send-alert', `🎉 送信完了！`, 'success');
       document.getElementById('msg-title').value = '';
       document.getElementById('msg-body').value = '';
       loadHistory();
@@ -84,11 +81,8 @@ async function handleSend(e) {
   }
 }
 
-// 送信履歴取得（高速化：キャッシュ回避のみ実施）
 async function loadHistory() {
   const container = document.getElementById('history-container');
-  container.innerHTML = '<p style="text-align:center;color:var(--text-sub);">読み込み中...</p>';
-
   try {
     const res = await fetch('/api/messages?' + Date.now());
     const data = await res.json();
@@ -98,7 +92,6 @@ async function loadHistory() {
       return;
     }
 
-    // 全削除ボタン
     const clearBtn = `
       <div style="text-align:right;margin-bottom:12px;">
         <button onclick="deleteAllMessages()" class="btn-danger" id="clear-all-btn">
@@ -112,8 +105,11 @@ async function loadHistory() {
         hour: '2-digit', minute: '2-digit'
       });
       return `
-        <div class="message-item" id="msg-${msg.id}" style="position:relative;">
-          <button onclick="deleteMessage(${msg.id})" class="btn-delete-single" title="この履歴を削除">✕</button>
+        <div class="message-item" id="msg-${msg.id}">
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:8px;">
+            <button onclick="openEditModal(${msg.id}, '${escapeQuote(msg.title)}', '${escapeQuote(msg.body)}')" style="background:#E0F2FE;color:#0369A1;border:1px solid #7DD3FC;border-radius:8px;padding:6px 14px;font-size:15px;font-weight:bold;cursor:pointer;">✏️ 編集</button>
+            <button onclick="deleteMessage(${msg.id})" style="background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5;border-radius:8px;padding:6px 14px;font-size:15px;font-weight:bold;cursor:pointer;">🗑️ 削除</button>
+          </div>
           <div class="message-title">${escapeHTML(msg.title)}</div>
           <div class="message-body">${escapeHTML(msg.body)}</div>
           <div class="message-date">送信日時: ${date}</div>
@@ -126,21 +122,15 @@ async function loadHistory() {
   }
 }
 
-// 個別メッセージ削除
 async function deleteMessage(id) {
-  if (!confirm('この履歴を削除しますか？')) return;
+  if (!confirm('このお知らせを削除しますか？')) return;
   try {
     const res = await fetch(`/api/admin/messages/${id}`, {
       method: 'DELETE',
       headers: { 'x-admin-password': adminPassword }
     });
     if (res.ok) {
-      const el = document.getElementById(`msg-${id}`);
-      if (el) {
-        el.style.opacity = '0';
-        el.style.transition = 'opacity 0.3s';
-        setTimeout(() => { el.remove(); }, 300);
-      }
+      loadHistory();
     } else {
       alert('削除に失敗しました。');
     }
@@ -149,19 +139,48 @@ async function deleteMessage(id) {
   }
 }
 
-// 全履歴一括削除
 async function deleteAllMessages() {
-  if (!confirm('全ての送信履歴を削除しますか？\nこの操作は元に戻せません。')) return;
+  if (!confirm('全ての送信履歴を削除しますか？')) return;
   try {
     const res = await fetch('/api/admin/messages', {
       method: 'DELETE',
       headers: { 'x-admin-password': adminPassword }
     });
     if (res.ok) {
-      showAlert('send-alert', '🗑️ 全ての送信履歴を削除しました。', 'success');
       loadHistory();
     } else {
       alert('削除に失敗しました。');
+    }
+  } catch (err) {
+    alert('通信エラーが発生しました。');
+  }
+}
+
+function openEditModal(id, title, body) {
+  const newTitle = prompt('【編集】新しいタイトルを入力してください:', title);
+  if (newTitle === null) return;
+  const newBody = prompt('【編集】新しい本文を入力してください:', body);
+  if (newBody === null) return;
+
+  if (!newTitle.trim() || !newBody.trim()) {
+    alert('タイトルと本文を入力してください。');
+    return;
+  }
+  saveEdit(id, newTitle.trim(), newBody.trim());
+}
+
+async function saveEdit(id, title, body) {
+  try {
+    const res = await fetch(`/api/admin/messages/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
+      body: JSON.stringify({ title, body })
+    });
+    if (res.ok) {
+      showAlert('send-alert', '✏️ 編集保存しました。', 'success');
+      loadHistory();
+    } else {
+      alert('保存に失敗しました。');
     }
   } catch (err) {
     alert('通信エラーが発生しました。');
@@ -180,4 +199,8 @@ function escapeHTML(str) {
   return str.replace(/[&<>'"]/g,
     tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
   );
+}
+
+function escapeQuote(str) {
+  return str.replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n');
 }
