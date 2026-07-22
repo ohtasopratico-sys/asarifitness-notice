@@ -1,1 +1,1 @@
-web: python server_cloud.py
+web: python server.py
