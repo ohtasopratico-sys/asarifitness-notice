@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 外部依存ゼロ・どのPCおよびクラウド（Render/Fly.io等）でも即座に動く
-完全統合 Web通知＆SQLite サーバー
+完全統合 Web通知＆SQLite サーバー (削除・編集対応版)
 """
 
 import http.server
@@ -14,15 +14,11 @@ import os
 import sys
 from datetime import datetime
 
-# 環境変数 PORT（Renderが指定）があればそれを使用、なければ3000
 PORT = int(os.environ.get('PORT', 3000))
-
-# データベース保存先
 DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(DATA_DIR, 'push_system.db')
 PUBLIC_DIR = os.path.join(DATA_DIR, 'public')
 
-# --- SQLite データベース初期化 ---
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -46,7 +42,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-# --- HTTPリクエストハンドラー ---
 class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=PUBLIC_DIR, **kwargs)
@@ -56,11 +51,11 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
 
     def end_headers(self):
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type, x-admin-password')
         if self.path.startswith('/api/'):
             self.send_header('Cache-Control', 'no-cache, no-store')
-        elif any(self.path.endswith(ext) for ext in ('.css', '.js', '.jpg', '.png', '.ico', '.jpg')):
+        elif any(self.path.endswith(ext) for ext in ('.css', '.js', '.jpg', '.png', '.ico')):
             self.send_header('Cache-Control', 'public, max-age=3600')
         else:
             self.send_header('Cache-Control', 'no-cache')
@@ -105,6 +100,39 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_json_response({"error": "認証エラー"}, status=401)
                 return
             self.handle_admin_send(body)
+            return
+
+        self.send_error(404, "Not Found")
+
+    def do_PUT(self):
+        password = self.headers.get('x-admin-password', '')
+        admin_pass = os.environ.get('ADMIN_PASSWORD', 'admin123')
+        if password != admin_pass:
+            self.send_json_response({"error": "認証エラー"}, status=401)
+            return
+
+        m = _re.match(r'^/api/admin/messages/(\d+)$', self.path)
+        if m:
+            msg_id = int(m.group(1))
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length) if content_length > 0 else b'{}'
+            try:
+                body = json.loads(post_data.decode('utf-8'))
+            except Exception:
+                body = {}
+
+            title = body.get("title", "").strip()
+            msg_body = body.get("body", "").strip()
+
+            if not title or not msg_body:
+                self.send_json_response({"error": "タイトルと本文を入力してください"}, status=400)
+                return
+
+            conn = sqlite3.connect(DB_FILE)
+            conn.execute("UPDATE messages SET title = ?, body = ? WHERE id = ?", (title, msg_body, msg_id))
+            conn.commit()
+            conn.close()
+            self.send_json_response({"message": "更新しました"})
             return
 
         self.send_error(404, "Not Found")
@@ -185,7 +213,6 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps(data, ensure_ascii=False).encode('utf-8'))
 
-# --- メイン実行 ---
 def main():
     init_db()
     socketserver.ThreadingTCPServer.allow_reuse_address = True
