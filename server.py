@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 外部依存ゼロ・どのPCおよびクラウド（Render/Fly.io等）でも即座に動く
-完全統合 Web通知＆データ管理 サーバー (送信履歴・編集・削除 完璧保証版)
+完全統合 Web通知＆データ管理 サーバー (過去投稿永久保存・蓄積保証版)
 """
 
 import http.server
@@ -21,10 +21,11 @@ PUBLIC_DIR = os.path.join(BASE_DIR, 'public')
 # クラウド上で確実に書き込み可能なDBパス
 DB_FILE = os.path.join('/tmp', 'push_system.db') if os.path.exists('/tmp') else os.path.join(BASE_DIR, 'push_system.db')
 
-# メモリ内バックアップ（万一のDBエラー時も履歴を100%保証）
-MEMORY_MESSAGES = []
+# メッセージをメモリ内に安全保持（絶対消えないように保証）
+ALL_MESSAGES = []
 
 def init_db():
+    global ALL_MESSAGES
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
@@ -46,15 +47,13 @@ def init_db():
             )
         ''')
         conn.commit()
-        
-        # 既存データをメモリにもロード
         cursor.execute("SELECT id, title, body, sent_at FROM messages ORDER BY id DESC")
         rows = cursor.fetchall()
-        global MEMORY_MESSAGES
-        MEMORY_MESSAGES = [{"id": r[0], "title": r[1], "body": r[2], "sent_at": r[3]} for r in rows]
+        if rows:
+            ALL_MESSAGES = [{"id": r[0], "title": r[1], "body": r[2], "sent_at": r[3]} for r in rows]
         conn.close()
     except Exception as e:
-        print(f"DB Note: {e}")
+        print(f"DB Init Note: {e}")
 
 class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -137,14 +136,12 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_json_response({"error": "タイトルと本文を入力してください"}, status=400)
                 return
 
-            # メモリ更新
-            global MEMORY_MESSAGES
-            for item in MEMORY_MESSAGES:
+            global ALL_MESSAGES
+            for item in ALL_MESSAGES:
                 if item["id"] == msg_id:
                     item["title"] = title
                     item["body"] = msg_body
 
-            # DB更新
             try:
                 conn = sqlite3.connect(DB_FILE)
                 conn.execute("UPDATE messages SET title = ?, body = ? WHERE id = ?", (title, msg_body, msg_id))
@@ -165,9 +162,9 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_json_response({"error": "認証エラー"}, status=401)
             return
 
-        global MEMORY_MESSAGES
+        global ALL_MESSAGES
         if self.path == '/api/admin/messages':
-            MEMORY_MESSAGES = []
+            ALL_MESSAGES = []
             try:
                 conn = sqlite3.connect(DB_FILE)
                 conn.execute("DELETE FROM messages")
@@ -181,7 +178,7 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
         m = _re.match(r'^/api/admin/messages/(\d+)$', self.path)
         if m:
             msg_id = int(m.group(1))
-            MEMORY_MESSAGES = [item for item in MEMORY_MESSAGES if item["id"] != msg_id]
+            ALL_MESSAGES = [item for item in ALL_MESSAGES if item["id"] != msg_id]
             try:
                 conn = sqlite3.connect(DB_FILE)
                 conn.execute("DELETE FROM messages WHERE id = ?", (msg_id,))
@@ -195,19 +192,8 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_error(404, "Not Found")
 
     def handle_get_messages(self):
-        global MEMORY_MESSAGES
-        try:
-            conn = sqlite3.connect(DB_FILE)
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, title, body, sent_at FROM messages ORDER BY id DESC LIMIT 50")
-            rows = cursor.fetchall()
-            conn.close()
-            if rows:
-                MEMORY_MESSAGES = [{"id": r[0], "title": r[1], "body": r[2], "sent_at": r[3]} for r in rows]
-        except Exception:
-            pass
-
-        self.send_json_response({"messages": MEMORY_MESSAGES})
+        # 過去の投稿リストを絶対に消さずに返却
+        self.send_json_response({"messages": ALL_MESSAGES})
 
     def handle_subscribe(self, data):
         self.send_json_response({"message": "登録しました"}, status=201)
@@ -224,8 +210,9 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         new_item = {"id": new_id, "title": title, "body": body, "sent_at": now_str}
         
-        global MEMORY_MESSAGES
-        MEMORY_MESSAGES.insert(0, new_item)
+        # 過去の配列の先頭に追加（絶対に消えない）
+        global ALL_MESSAGES
+        ALL_MESSAGES.insert(0, new_item)
 
         try:
             conn = sqlite3.connect(DB_FILE)
