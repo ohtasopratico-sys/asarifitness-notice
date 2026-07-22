@@ -1,142 +1,105 @@
-// client.js: PWA / ブラウザ通知登録 & Pythonバックエンド連携
+// client.js: お客様用通知・メッセージ同期画面 (リアルタイム自動同期・改行対応)
 
-function checkIOS() {
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-  const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+document.addEventListener('DOMContentLoaded', () => {
+  initClient();
+});
 
-  if (isIOS && !isStandalone) {
-    const iosGuide = document.getElementById('ios-guide');
-    if (iosGuide) iosGuide.style.display = 'block';
+function initClient() {
+  // 初回読み込み
+  loadClientMessages();
+
+  # 15秒ごとの自動同期（管理者が更新した内容が即座にお客さんのスマホに反映される）
+  setInterval(() => {
+    loadClientMessages();
+  }, 15000);
+
+  const subBtn = document.getElementById('subscribe-btn');
+  if (subBtn) {
+    subBtn.addEventListener('click', handleSubscribe);
   }
 }
 
-async function registerServiceWorker() {
-  if (!('serviceWorker' in navigator)) return;
-  try {
-    await navigator.serviceWorker.register('/sw.js');
-  } catch (err) {
-    console.log('SW Note:', err.message);
-  }
-}
-
-function updateUIStatus() {
-  const btn = document.getElementById('subscribe-btn');
-  const badge = document.getElementById('status-badge');
-  if (!btn || !badge) return;
-
-  if (!('Notification' in window)) {
-    badge.textContent = '⚠️ お使いのブラウザは通知に対応していません';
-    btn.disabled = true;
-    return;
-  }
-
-  if (Notification.permission === 'granted') {
-    badge.textContent = '✅ 通知を受信できる状態です';
-    badge.classList.add('active');
-    btn.innerHTML = '<span class="btn-icon">✨</span><span>通知の登録が完了しています</span>';
-    btn.style.backgroundColor = '#2563EB';
-  } else if (Notification.permission === 'denied') {
-    badge.textContent = '❌ 通知が設定で禁止されています';
-    badge.classList.remove('active');
-    btn.disabled = true;
-  } else {
-    badge.textContent = '未登録：下のボタンを押してください';
-    badge.classList.remove('active');
-  }
-}
-
-async function subscribeUser() {
-  if (!('Notification' in window)) {
-    alert('お使いのブラウザは通知に対応していません。');
-    return;
-  }
-
-  try {
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      // サーバーへ登録データを送信
-      await fetch('/api/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          endpoint: 'client-' + Date.now(),
-          keys: { p256dh: 'sample-p256dh', auth: 'sample-auth' }
-        })
-      });
-
-      alert('🎉 通知の登録が完了しました！');
-      
-      // テスト発火
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('📢 通知登録完了', {
-          body: 'お店からの最新お知らせがこの画面と通知センターに届きます。',
-          icon: '/icon-192.png'
-        });
-      }
-    } else {
-      alert('通知許可が拒否されました。設定をご確認ください。');
-    }
-  } catch (err) {
-    console.error('購読エラー:', err);
-  } finally {
-    updateUIStatus();
-  }
-}
-
-async function loadMessages() {
-  const container = document.getElementById('message-container');
+// お知らせ一覧の取得とリアルタイム同期
+async function loadClientMessages() {
+  const container = document.getElementById('message-list');
   if (!container) return;
 
   try {
-    const res = await fetch('/api/messages');
-    const data = await res.json();
+    const res = await fetch('/api/messages?t=' + Date.now());
+    if (!res.ok) return;
 
-    if (!data.messages || data.messages.length === 0) {
-      container.innerHTML = '<p style="text-align: center; color: var(--text-sub);">現在、届いているお知らせはありません。</p>';
+    const data = await res.json();
+    const messages = data.messages || [];
+
+    if (messages.length === 0) {
+      // 既存のコンテンツがある場合は無理に上書き消去しない
+      if (container.children.length === 0 || container.innerText.includes('読み込み中')) {
+        container.innerHTML = '<p class="no-messages">現在届いているお知らせはありません。</p>';
+      }
       return;
     }
 
-    container.innerHTML = data.messages.map(msg => {
+    // 改行コードを保持して綺麗に表示
+    const html = messages.slice(0, 7).map(msg => {
       const date = new Date(msg.sent_at).toLocaleString('ja-JP', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+        year: 'numeric', month: 'long', day: 'numeric',
+        hour: '2-digit', minute: '2-digit'
       });
+      const formattedBody = escapeHTML(msg.body).replace(/\n/g, '<br>');
+
       return `
         <div class="message-item">
           <div class="message-title">${escapeHTML(msg.title)}</div>
-          <div class="message-body">${escapeHTML(msg.body)}</div>
+          <div class="message-body" style="white-space: pre-wrap; line-height: 1.6;">${formattedBody}</div>
           <div class="message-date">配信日時: ${date}</div>
-        </div>
-      `;
+        </div>`;
     }).join('');
 
+    container.innerHTML = html;
   } catch (err) {
-    console.error('メッセージ読み込みエラー:', err);
-    container.innerHTML = '<p style="text-align: center; color: red;">メッセージの読み込みに失敗しました。</p>';
+    // 通信エラー時も画面から通知を消さずに保護
+    console.log('同期確認中...');
+  }
+}
+
+async function handleSubscribe() {
+  const btn = document.getElementById('subscribe-btn');
+  const alertEl = document.getElementById('client-alert');
+  if (!btn) return;
+
+  btn.disabled = true;
+  btn.innerText = '設定中... ⏳';
+
+  try {
+    const res = await fetch('/api/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: 'demo-user-' + Date.now() })
+    });
+    if (res.ok) {
+      if (alertEl) {
+        alertEl.textContent = '🎉 お知らせの受信設定が完了しました！';
+        alertEl.className = 'alert alert-success';
+        alertEl.style.display = 'block';
+      }
+      btn.innerText = '✅ 受信設定済み';
+    } else {
+      throw new Error();
+    }
+  } catch (e) {
+    if (alertEl) {
+      alertEl.textContent = '設定に失敗しました。時間をおいてお試しください。';
+      alertEl.className = 'alert alert-error';
+      alertEl.style.display = 'block';
+    }
+    btn.disabled = false;
+    btn.innerText = '🔔 お知らせを受け取る';
   }
 }
 
 function escapeHTML(str) {
-  return str.replace(/[&<>'"]/g, 
-    tag => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      "'": '&#39;',
-      '"': '&quot;'
-    }[tag] || tag)
+  if (!str) return '';
+  return str.replace(/[&<>'"]/g,
+    tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
   );
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-  checkIOS();
-  registerServiceWorker();
-  updateUIStatus();
-  loadMessages();
-
-  const subBtn = document.getElementById('subscribe-btn');
-  if (subBtn) subBtn.addEventListener('click', subscribeUser);
-});
