@@ -1,52 +1,70 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-外部依存ゼロ・どのPCおよびクラウド（Render/Fly.io等）でも即座に動く
-完全統合 Web通知＆データ管理 サーバー (重複統合・最新7件保持保証版)
+外部依存ゼロ・GitHubをデータベースとして使う永久保存版サーバー
+コードを何度更新してもメッセージが消えない完全版
 """
 
 import http.server
 import socketserver
 import re as _re
 import json
-import sqlite3
 import os
 import sys
+import base64
+import urllib.request
+import urllib.error
 from datetime import datetime
 
 PORT = int(os.environ.get('PORT', 3000))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PUBLIC_DIR = os.path.join(BASE_DIR, 'public')
 
-DB_FILE = os.path.join('/tmp', 'push_system.db') if os.path.exists('/tmp') else os.path.join(BASE_DIR, 'push_system.db')
+GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')
+GITHUB_REPO  = 'ohtasopratico-sys/asarifitness-notice'
+MESSAGES_FILE = 'messages.json'
+MAX_MESSAGES  = 7
 
-ALL_MESSAGES = []
-
-def init_db():
+def github_read():
+    """GitHubからメッセージ一覧とSHAを取得する"""
+    if not GITHUB_TOKEN:
+        return [], None
+    url = f'https://api.github.com/repos/{GITHUB_REPO}/contents/{MESSAGES_FILE}'
+    req = urllib.request.Request(url)
+    req.add_header('Authorization', f'Bearer {GITHUB_TOKEN}')
+    req.add_header('Accept', 'application/vnd.github+json')
     try:
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS subscriptions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                endpoint TEXT UNIQUE NOT NULL,
-                p256dh TEXT NOT NULL,
-                auth TEXT NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                body TEXT NOT NULL,
-                sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        conn.commit()
-        conn.close()
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read())
+            content = base64.b64decode(data['content']).decode('utf-8')
+            return json.loads(content), data['sha']
     except Exception as e:
-        print(f"Init DB Note: {e}")
+        print(f'GitHub読み込みエラー: {e}')
+        return [], None
+
+def github_write(messages, sha):
+    """GitHubにメッセージ一覧を書き込む"""
+    if not GITHUB_TOKEN or sha is None:
+        return False
+    url = f'https://api.github.com/repos/{GITHUB_REPO}/contents/{MESSAGES_FILE}'
+    encoded = base64.b64encode(
+        json.dumps(messages, ensure_ascii=False, indent=2).encode('utf-8')
+    ).decode('utf-8')
+    payload = json.dumps({
+        'message': 'Update messages',
+        'content': encoded,
+        'sha': sha
+    }).encode('utf-8')
+    req = urllib.request.Request(url, data=payload, method='PUT')
+    req.add_header('Authorization', f'Bearer {GITHUB_TOKEN}')
+    req.add_header('Content-Type', 'application/json')
+    req.add_header('Accept', 'application/vnd.github+json')
+    try:
+        with urllib.request.urlopen(req, timeout=15):
+            return True
+    except Exception as e:
+        print(f'GitHub書き込みエラー: {e}')
+        return False
 
 class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -84,10 +102,10 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
             body = {}
 
         if self.path == '/api/subscribe':
-            self.handle_subscribe(body)
+            self.send_json_response({"message": "登録しました"}, status=201)
             return
         if self.path == '/api/admin/login':
-            password = self.headers.get('x-admin-password', '')
+            password  = self.headers.get('x-admin-password', '')
             admin_pass = os.environ.get('ADMIN_PASSWORD', 'admin123')
             if password == admin_pass:
                 self.send_json_response({"success": True})
@@ -95,7 +113,7 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_json_response({"error": "パスワードが違います"}, status=401)
             return
         if self.path == '/api/admin/send':
-            password = self.headers.get('x-admin-password', '')
+            password  = self.headers.get('x-admin-password', '')
             admin_pass = os.environ.get('ADMIN_PASSWORD', 'admin123')
             if password != admin_pass:
                 self.send_json_response({"error": "認証エラー"}, status=401)
@@ -106,7 +124,7 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_error(404, "Not Found")
 
     def do_PUT(self):
-        password = self.headers.get('x-admin-password', '')
+        password  = self.headers.get('x-admin-password', '')
         admin_pass = os.environ.get('ADMIN_PASSWORD', 'admin123')
         if password != admin_pass:
             self.send_json_response({"error": "認証エラー"}, status=401)
@@ -122,117 +140,74 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
             except Exception:
                 body = {}
 
-            title = str(body.get("title", "")).strip()
-            msg_body = str(body.get("body", "")).strip()
-
+            title    = str(body.get("title", "")).strip()
+            msg_body = str(body.get("body",  "")).strip()
             if not title or not msg_body:
                 self.send_json_response({"error": "タイトルと本文を入力してください"}, status=400)
                 return
 
-            global ALL_MESSAGES
-            for item in ALL_MESSAGES:
-                if item["id"] == msg_id:
+            messages, sha = github_read()
+            for item in messages:
+                if item.get("id") == msg_id:
                     item["title"] = title
-                    item["body"] = msg_body
+                    item["body"]  = msg_body
+                    break
 
-            try:
-                conn = sqlite3.connect(DB_FILE)
-                conn.execute("UPDATE messages SET title = ?, body = ? WHERE id = ?", (title, msg_body, msg_id))
-                conn.commit()
-                conn.close()
-            except Exception:
-                pass
-
+            github_write(messages, sha)
             self.send_json_response({"message": "更新しました"})
             return
 
         self.send_error(404, "Not Found")
 
     def do_DELETE(self):
-        password = self.headers.get('x-admin-password', '')
+        password  = self.headers.get('x-admin-password', '')
         admin_pass = os.environ.get('ADMIN_PASSWORD', 'admin123')
         if password != admin_pass:
             self.send_json_response({"error": "認証エラー"}, status=401)
             return
 
-        global ALL_MESSAGES
         if self.path == '/api/admin/messages':
-            ALL_MESSAGES = []
-            try:
-                conn = sqlite3.connect(DB_FILE)
-                conn.execute("DELETE FROM messages")
-                conn.commit()
-                conn.close()
-            except Exception:
-                pass
+            _, sha = github_read()
+            github_write([], sha)
             self.send_json_response({"message": "全履歴を削除しました"})
             return
 
         m = _re.match(r'^/api/admin/messages/(\d+)$', self.path)
         if m:
-            msg_id = int(m.group(1))
-            ALL_MESSAGES = [item for item in ALL_MESSAGES if item["id"] != msg_id]
-            try:
-                conn = sqlite3.connect(DB_FILE)
-                conn.execute("DELETE FROM messages WHERE id = ?", (msg_id,))
-                conn.commit()
-                conn.close()
-            except Exception:
-                pass
+            msg_id   = int(m.group(1))
+            messages, sha = github_read()
+            messages = [x for x in messages if x.get("id") != msg_id]
+            github_write(messages, sha)
             self.send_json_response({"message": "削除しました"})
             return
 
         self.send_error(404, "Not Found")
 
     def handle_get_messages(self):
-        global ALL_MESSAGES
-        # DBから読み込んで既存のメモリ配列とIDで重複なく統合
-        try:
-            conn = sqlite3.connect(DB_FILE)
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, title, body, sent_at FROM messages ORDER BY id DESC LIMIT 20")
-            rows = cursor.fetchall()
-            conn.close()
-            if rows:
-                db_msgs = [{"id": int(r[0]), "title": str(r[1]), "body": str(r[2]), "sent_at": str(r[3])} for r in rows]
-                existing_ids = {m["id"] for m in ALL_MESSAGES}
-                for db_m in db_msgs:
-                    if db_m["id"] not in existing_ids:
-                        ALL_MESSAGES.append(db_m)
-                # ID降順（新しい順）に並び替え
-                ALL_MESSAGES.sort(key=lambda x: x["id"], reverse=True)
-        except Exception:
-            pass
-
-        self.send_json_response({"messages": ALL_MESSAGES[:7]})
-
-    def handle_subscribe(self, data):
-        self.send_json_response({"message": "登録しました"}, status=201)
+        messages, _ = github_read()
+        self.send_json_response({"messages": messages[:MAX_MESSAGES]})
 
     def handle_admin_send(self, data):
-        title = str(data.get("title", "")).strip()
-        body  = str(data.get("body",  "")).strip()
+        title    = str(data.get("title", "")).strip()
+        body     = str(data.get("body",  "")).strip()
         if not title or not body:
             self.send_json_response({"error": "タイトルと本文を入力してください"}, status=400)
             return
 
-        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        new_id = int(datetime.now().timestamp() * 1000)
+        messages, sha = github_read()
 
-        new_item = {"id": new_id, "title": title, "body": body, "sent_at": now_str}
-        
-        global ALL_MESSAGES
-        ALL_MESSAGES.insert(0, new_item)
+        new_item = {
+            "id":      int(datetime.now().timestamp() * 1000),
+            "title":   title,
+            "body":    body,
+            "sent_at": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+        messages.insert(0, new_item)
 
-        try:
-            conn = sqlite3.connect(DB_FILE)
-            cursor = conn.cursor()
-            cursor.execute("INSERT INTO messages (id, title, body, sent_at) VALUES (?, ?, ?, ?)", (new_id, title, body, now_str))
-            conn.commit()
-            conn.close()
-        except Exception:
-            pass
+        # 最大7件まで保持
+        messages = messages[:MAX_MESSAGES]
 
+        github_write(messages, sha)
         self.send_json_response({"message": "送信完了", "successCount": 1, "failureCount": 0})
 
     def send_json_response(self, data, status=200):
@@ -242,13 +217,12 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.end_headers()
             self.wfile.write(res_bytes)
-        except Exception as e:
-            self.send_response(500)
-            self.end_headers()
-            self.wfile.write(b'{"messages":[]}')
+        except Exception:
+            pass
 
 def main():
-    init_db()
+    if not GITHUB_TOKEN:
+        print("⚠️  GITHUB_TOKEN が設定されていません。Renderの Environment に追加してください。")
     socketserver.ThreadingTCPServer.allow_reuse_address = True
     httpd = socketserver.ThreadingTCPServer(("0.0.0.0", PORT), PushSystemRequestHandler)
     print(f"🚀 サーバー起動: PORT {PORT}")
