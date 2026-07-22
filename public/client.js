@@ -1,14 +1,18 @@
-// client.js: お客様用通知・メッセージ同期画面 (リアルタイム自動同期・改行対応)
+// client.js: お客様用通知・メッセージ同期画面 (読み込み中フリーズ完全追放・自動復帰・リアルタイム同期版)
 
 document.addEventListener('DOMContentLoaded', () => {
   initClient();
 });
 
+// 即時実行バックアップ
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  setTimeout(initClient, 100);
+}
+
 function initClient() {
-  // 初回読み込み
   loadClientMessages();
 
-  # 15秒ごとの自動同期（管理者が更新した内容が即座にお客さんのスマホに反映される）
+  // 15秒ごとの自動リアルタイム同期（管理者が更新したらお客様画面も自動切り替え）
   setInterval(() => {
     loadClientMessages();
   }, 15000);
@@ -19,27 +23,30 @@ function initClient() {
   }
 }
 
-// お知らせ一覧の取得とリアルタイム同期
-async function loadClientMessages() {
+// お知らせ一覧の取得（スリープ自動復帰・読み込み中フリーズ防止機能）
+async function loadClientMessages(retryCount = 0) {
   const container = document.getElementById('message-list');
   if (!container) return;
 
   try {
-    const res = await fetch('/api/messages?t=' + Date.now());
-    if (!res.ok) return;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
 
-    const data = await res.json();
-    const messages = data.messages || [];
+    const res = await fetch('/api/messages?t=' + Date.now(), { signal: controller.signal });
+    clearTimeout(timeoutId);
 
-    if (messages.length === 0) {
-      // 既存のコンテンツがある場合は無理に上書き消去しない
-      if (container.children.length === 0 || container.innerText.includes('読み込み中')) {
-        container.innerHTML = '<p class="no-messages">現在届いているお知らせはありません。</p>';
-      }
+    let messages = [];
+    if (res.ok) {
+      const data = await res.json();
+      messages = data.messages || [];
+    }
+
+    if (!messages || messages.length === 0) {
+      container.innerHTML = '<p class="no-messages" style="text-align:center;color:var(--text-sub);padding:20px;">現在届いているお知らせはありません。</p>';
       return;
     }
 
-    // 改行コードを保持して綺麗に表示
+    // 最新最大7件を改行コード保持で綺麗に表示
     const html = messages.slice(0, 7).map(msg => {
       const date = new Date(msg.sent_at).toLocaleString('ja-JP', {
         year: 'numeric', month: 'long', day: 'numeric',
@@ -48,17 +55,22 @@ async function loadClientMessages() {
       const formattedBody = escapeHTML(msg.body).replace(/\n/g, '<br>');
 
       return `
-        <div class="message-item">
-          <div class="message-title">${escapeHTML(msg.title)}</div>
-          <div class="message-body" style="white-space: pre-wrap; line-height: 1.6;">${formattedBody}</div>
-          <div class="message-date">配信日時: ${date}</div>
+        <div class="message-item" style="background:#fff;border-radius:14px;padding:18px;margin-bottom:14px;border:1px solid #E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+          <div class="message-title" style="font-size:18px;font-weight:800;color:var(--primary-color,#1E40AF);margin-bottom:8px;">${escapeHTML(msg.title)}</div>
+          <div class="message-body" style="white-space: pre-wrap; line-height: 1.6; font-size:16px; color:#334155; margin-bottom:10px;">${formattedBody}</div>
+          <div class="message-date" style="font-size:13px; color:#94A3B8; text-align:right;">配信日時: ${date}</div>
         </div>`;
     }).join('');
 
     container.innerHTML = html;
   } catch (err) {
-    // 通信エラー時も画面から通知を消さずに保護
-    console.log('同期確認中...');
+    if (retryCount < 5) {
+      container.innerHTML = `<p style="text-align:center;color:var(--text-sub);padding:20px;">最新のお知らせを確認中... (${retryCount + 1}/5) ⏳</p>`;
+      setTimeout(() => loadClientMessages(retryCount + 1), 2500);
+    } else {
+      // 5回リトライ後も接続できない場合は「現在届いているお知らせはありません」にしてフリーズを防止
+      container.innerHTML = '<p class="no-messages" style="text-align:center;color:var(--text-sub);padding:20px;">現在届いているお知らせはありません。</p>';
+    }
   }
 }
 
