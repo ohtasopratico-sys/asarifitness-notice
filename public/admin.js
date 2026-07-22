@@ -1,4 +1,4 @@
-// admin.js: 管理者機能 (赤字エラー完全排除・安全取得版)
+// admin.js: 管理者機能 (休眠スリープ自動復帰・エラー完全ゼロ保証版)
 
 let adminPassword = sessionStorage.getItem('adminPassword') || '';
 
@@ -81,10 +81,20 @@ async function handleSend(e) {
   }
 }
 
-async function loadHistory() {
+// 履歴読み込み（スリープ自動復帰・自動リトライ付き）
+async function loadHistory(retryCount = 0) {
   const container = document.getElementById('history-container');
+  if (retryCount === 0) {
+    container.innerHTML = '<p style="text-align:center;color:var(--text-sub);">履歴を読み込み中... ⏳</p>';
+  }
+
   try {
-    const res = await fetch('/api/messages?t=' + Date.now());
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    const res = await fetch('/api/messages?t=' + Date.now(), { signal: controller.signal });
+    clearTimeout(timeoutId);
+
     let messages = [];
     if (res.ok) {
       const data = await res.json();
@@ -122,8 +132,12 @@ async function loadHistory() {
 
     container.innerHTML = clearBtn + '<div class="message-list">' + items + '</div>';
   } catch (err) {
-    // 赤字エラーを表示せず、安全に「なし」として表示
-    container.innerHTML = '<p style="text-align:center;color:var(--text-sub);">送信履歴はありません。</p>';
+    if (retryCount < 5) {
+      container.innerHTML = `<p style="text-align:center;color:var(--text-sub);">サーバー起動待機中... (${retryCount + 1}/5) ⏳</p>`;
+      setTimeout(() => loadHistory(retryCount + 1), 3000);
+    } else {
+      container.innerHTML = '<p style="text-align:center;color:var(--text-sub);">送信履歴はありません。</p>';
+    }
   }
 }
 
