@@ -1,6 +1,7 @@
-// admin.js: 管理者機能 (休眠スリープ自動復帰・エラー完全ゼロ保証版)
+// admin.js: 管理者機能 (直感的改行対応・編集画面対応版)
 
 let adminPassword = sessionStorage.getItem('adminPassword') || '';
+let currentEditId = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   if (adminPassword) {
@@ -81,7 +82,7 @@ async function handleSend(e) {
   }
 }
 
-// 履歴読み込み（スリープ自動復帰・自動リトライ付き）
+// 履歴読み込み
 async function loadHistory(retryCount = 0) {
   const container = document.getElementById('history-container');
   if (retryCount === 0) {
@@ -118,14 +119,19 @@ async function loadHistory(retryCount = 0) {
         year: 'numeric', month: 'long', day: 'numeric',
         hour: '2-digit', minute: '2-digit'
       });
+      // 改行コードをHTML改行に変換
+      const formattedBody = escapeHTML(msg.body).replace(/\n/g, '<br>');
+      const rawTitle = escapeQuote(msg.title);
+      const rawBody = escapeQuote(msg.body);
+
       return `
         <div class="message-item" id="msg-${msg.id}">
           <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:8px;">
-            <button onclick="openEditModal(${msg.id}, '${escapeQuote(msg.title)}', '${escapeQuote(msg.body)}')" style="background:#E0F2FE;color:#0369A1;border:1px solid #7DD3FC;border-radius:8px;padding:6px 14px;font-size:15px;font-weight:bold;cursor:pointer;">✏️ 編集</button>
+            <button onclick="openEditModal(${msg.id}, '${rawTitle}', '${rawBody}')" style="background:#E0F2FE;color:#0369A1;border:1px solid #7DD3FC;border-radius:8px;padding:6px 14px;font-size:15px;font-weight:bold;cursor:pointer;">✏️ 編集</button>
             <button onclick="deleteMessage(${msg.id})" style="background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5;border-radius:8px;padding:6px 14px;font-size:15px;font-weight:bold;cursor:pointer;">🗑️ 削除</button>
           </div>
           <div class="message-title">${escapeHTML(msg.title)}</div>
-          <div class="message-body">${escapeHTML(msg.body)}</div>
+          <div class="message-body" style="white-space: pre-wrap; line-height: 1.6;">${formattedBody}</div>
           <div class="message-date">送信日時: ${date}</div>
         </div>`;
     }).join('');
@@ -138,6 +144,51 @@ async function loadHistory(retryCount = 0) {
     } else {
       container.innerHTML = '<p style="text-align:center;color:var(--text-sub);">送信履歴はありません。</p>';
     }
+  }
+}
+
+// 直感的な編集画面（ポップアップモーダル）を開く
+function openEditModal(id, title, body) {
+  currentEditId = id;
+  // 改行コードの復元
+  const unescapedTitle = title.replace(/\\n/g, '\n').replace(/\\'/g, "'");
+  const unescapedBody = body.replace(/\\n/g, '\n').replace(/\\'/g, "'");
+
+  document.getElementById('edit-title').value = unescapedTitle;
+  document.getElementById('edit-body').value = unescapedBody;
+  document.getElementById('edit-modal').style.display = 'flex';
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').style.display = 'none';
+  currentEditId = null;
+}
+
+async function submitEdit() {
+  if (!currentEditId) return;
+  const title = document.getElementById('edit-title').value.trim();
+  const body = document.getElementById('edit-body').value.trim();
+
+  if (!title || !body) {
+    alert('タイトルと本文を入力してください。');
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/admin/messages/${currentEditId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
+      body: JSON.stringify({ title, body })
+    });
+    if (res.ok) {
+      closeEditModal();
+      showAlert('send-alert', '✏️ お知らせを更新保存しました。', 'success');
+      loadHistory();
+    } else {
+      alert('保存に失敗しました。');
+    }
+  } catch (err) {
+    alert('通信エラーが発生しました。');
   }
 }
 
@@ -175,37 +226,6 @@ async function deleteAllMessages() {
   }
 }
 
-function openEditModal(id, title, body) {
-  const newTitle = prompt('【編集】新しいタイトルを入力してください:', title);
-  if (newTitle === null) return;
-  const newBody = prompt('【編集】新しい本文を入力してください:', body);
-  if (newBody === null) return;
-
-  if (!newTitle.trim() || !newBody.trim()) {
-    alert('タイトルと本文を入力してください。');
-    return;
-  }
-  saveEdit(id, newTitle.trim(), newBody.trim());
-}
-
-async function saveEdit(id, title, body) {
-  try {
-    const res = await fetch(`/api/admin/messages/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPassword },
-      body: JSON.stringify({ title, body })
-    });
-    if (res.ok) {
-      showAlert('send-alert', '✏️ 編集保存しました。', 'success');
-      loadHistory();
-    } else {
-      alert('保存に失敗しました。');
-    }
-  } catch (err) {
-    alert('通信エラーが発生しました。');
-  }
-}
-
 function showAlert(elementId, message, type) {
   const el = document.getElementById(elementId);
   el.textContent = message;
@@ -221,5 +241,5 @@ function escapeHTML(str) {
 }
 
 function escapeQuote(str) {
-  return str.replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n');
+  return str.replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\r?\n/g, '\\n');
 }
