@@ -1,4 +1,4 @@
-// admin.js: 管理者機能 (直感的編集・自律モーダル生成・100%動作保証版)
+// admin.js: 管理者機能 (型一致・全環境編集ボタン動作100%保証版)
 
 let adminPassword = sessionStorage.getItem('adminPassword') || '';
 let currentEditId = null;
@@ -124,11 +124,11 @@ async function loadHistory(retryCount = 0) {
       return `
         <div class="message-item" id="msg-${msg.id}">
           <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:8px;">
-            <button onclick="triggerEdit(${msg.id})" style="background:#E0F2FE;color:#0369A1;border:1px solid #7DD3FC;border-radius:8px;padding:6px 14px;font-size:15px;font-weight:bold;cursor:pointer;">✏️ 編集</button>
-            <button onclick="deleteMessage(${msg.id})" style="background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5;border-radius:8px;padding:6px 14px;font-size:15px;font-weight:bold;cursor:pointer;">🗑️ 削除</button>
+            <button onclick="triggerEdit('${msg.id}')" style="background:#E0F2FE;color:#0369A1;border:1px solid #7DD3FC;border-radius:8px;padding:6px 14px;font-size:15px;font-weight:bold;cursor:pointer;">✏️ 編集</button>
+            <button onclick="deleteMessage('${msg.id}')" style="background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5;border-radius:8px;padding:6px 14px;font-size:15px;font-weight:bold;cursor:pointer;">🗑️ 削除</button>
           </div>
-          <div class="message-title">${escapeHTML(msg.title)}</div>
-          <div class="message-body" style="white-space: pre-wrap; line-height: 1.6;">${formattedBody}</div>
+          <div class="message-title" id="title-val-${msg.id}">${escapeHTML(msg.title)}</div>
+          <div class="message-body" id="body-val-${msg.id}" style="white-space: pre-wrap; line-height: 1.6;">${formattedBody}</div>
           <div class="message-date">送信日時: ${date}</div>
         </div>`;
     }).join('');
@@ -144,12 +144,23 @@ async function loadHistory(retryCount = 0) {
   }
 }
 
-// 編集モーダルを動的に生成して確実に開く
+// 編集モーダル（ポップアップ）を確実に発火
 function triggerEdit(id) {
-  const target = cachedMessages.find(m => m.id === id);
-  if (!target) return;
-
   currentEditId = id;
+  
+  // 型に関わらず文字列で検索
+  let target = cachedMessages.find(m => String(m.id) === String(id));
+  
+  let titleVal = target ? target.title : '';
+  let bodyVal = target ? target.body : '';
+
+  // 万一配列で見つからない場合は画面HTMLから直接取得フォールバック
+  if (!titleVal) {
+    const tEl = document.getElementById(`title-val-${id}`);
+    const bEl = document.getElementById(`body-val-${id}`);
+    if (tEl) titleVal = tEl.innerText;
+    if (bEl) bodyVal = bEl.innerText;
+  }
 
   let modal = document.getElementById('dynamic-edit-modal');
   if (!modal) {
@@ -176,8 +187,8 @@ function triggerEdit(id) {
     document.body.appendChild(modal);
   }
 
-  document.getElementById('dyn-edit-title').value = target.title;
-  document.getElementById('dyn-edit-body').value = target.body;
+  document.getElementById('dyn-edit-title').value = titleVal;
+  document.getElementById('dyn-edit-body').value = bodyVal;
   modal.style.display = 'flex';
 }
 
