@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 外部依存ゼロ・どのPCおよびクラウド（Render/Fly.io等）でも即座に動く
-完全統合 Web通知＆データ管理 サーバー (過去投稿永久保存・蓄積保証版)
+完全統合 Web通知＆データ管理 サーバー (最新最大7件制限版)
 """
 
 import http.server
@@ -21,7 +21,6 @@ PUBLIC_DIR = os.path.join(BASE_DIR, 'public')
 # クラウド上で確実に書き込み可能なDBパス
 DB_FILE = os.path.join('/tmp', 'push_system.db') if os.path.exists('/tmp') else os.path.join(BASE_DIR, 'push_system.db')
 
-# メッセージをメモリ内に安全保持（絶対消えないように保証）
 ALL_MESSAGES = []
 
 def init_db():
@@ -47,7 +46,7 @@ def init_db():
             )
         ''')
         conn.commit()
-        cursor.execute("SELECT id, title, body, sent_at FROM messages ORDER BY id DESC")
+        cursor.execute("SELECT id, title, body, sent_at FROM messages ORDER BY id DESC LIMIT 20")
         rows = cursor.fetchall()
         if rows:
             ALL_MESSAGES = [{"id": r[0], "title": r[1], "body": r[2], "sent_at": r[3]} for r in rows]
@@ -192,8 +191,8 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_error(404, "Not Found")
 
     def handle_get_messages(self):
-        # 過去の投稿リストを絶対に消さずに返却
-        self.send_json_response({"messages": ALL_MESSAGES})
+        # 過去の投稿リストを最新最大7件まで返却
+        self.send_json_response({"messages": ALL_MESSAGES[:7]})
 
     def handle_subscribe(self, data):
         self.send_json_response({"message": "登録しました"}, status=201)
@@ -210,7 +209,6 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         new_item = {"id": new_id, "title": title, "body": body, "sent_at": now_str}
         
-        # 過去の配列の先頭に追加（絶対に消えない）
         global ALL_MESSAGES
         ALL_MESSAGES.insert(0, new_item)
 
