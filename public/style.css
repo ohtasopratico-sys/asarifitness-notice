@@ -1,0 +1,303 @@
+/* 60-80代シニア層向け 高コントラスト・大文字・ユニバーサルデザインCSS */
+
+:root {
+  --bg-color: #F8FAFC;
+  --card-bg: #FFFFFF;
+  --text-main: #0F172A;
+  --text-sub: #334155;
+  --primary-color: #1E40AF;
+  --primary-hover: #1E3A8A;
+  --accent-color: #16A34A;
+  --accent-hover: #15803D;
+  --warning-bg: #FEF3C7;
+  --warning-border: #F59E0B;
+  --warning-text: #78350F;
+  --border-color: #CBD5E1;
+  --font-size-base: 18px;
+  --font-size-large: 22px;
+  --font-size-title: 28px;
+  --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "メイリオ", Meiryo, sans-serif;
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+  color: var(--text-main);
+  background-color: var(--bg-color);
+  padding: 16px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+header {
+  text-align: center;
+  padding: 24px 16px;
+  background-color: var(--primary-color);
+  color: #FFFFFF;
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  margin-bottom: 24px;
+}
+
+header h1 {
+  font-size: var(--font-size-title);
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+header p {
+  font-size: var(--font-size-large);
+  opacity: 0.95;
+}
+
+/* メインコンテンツカード */
+.card {
+  background: var(--card-bg);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border: 2px solid var(--border-color);
+  box-shadow: var(--shadow);
+}
+
+.card-title {
+  font-size: var(--font-size-large);
+  font-weight: 700;
+  color: var(--primary-color);
+  border-bottom: 3px solid var(--primary-color);
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 通知ボタンエリア */
+.subscribe-section {
+  text-align: center;
+}
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 68px;
+  font-size: var(--font-size-large);
+  font-weight: 800;
+  color: #FFFFFF;
+  background-color: var(--accent-color);
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
+  transition: all 0.2s ease-in-out;
+  padding: 16px 20px;
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+  background-color: var(--accent-hover);
+}
+
+.btn-primary:disabled {
+  background-color: #94A3B8;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-icon {
+  font-size: 28px;
+}
+
+.status-badge {
+  display: inline-block;
+  margin-top: 16px;
+  padding: 10px 20px;
+  font-size: var(--font-size-base);
+  font-weight: bold;
+  border-radius: 30px;
+  background-color: #E2E8F0;
+  color: var(--text-sub);
+}
+
+.status-badge.active {
+  background-color: #DCFCE7;
+  color: #15803D;
+  border: 2px solid #86EFAC;
+}
+
+/* メッセージ表示リスト */
+.message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.message-item {
+  background-color: #F1F5F9;
+  border-left: 6px solid var(--primary-color);
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.message-title {
+  font-size: var(--font-size-large);
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--text-main);
+}
+
+.message-body {
+  font-size: var(--font-size-base);
+  color: var(--text-sub);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.message-date {
+  font-size: 15px;
+  color: #64748B;
+  margin-top: 10px;
+  text-align: right;
+}
+
+/* iOS ホーム画面追加ガイドバナー */
+.btn-danger {
+  background-color: transparent;
+  color: var(--danger-color);
+  border: 2px solid var(--danger-color);
+  padding: 10px 18px;
+  font-size: 16px;
+  font-weight: bold;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-danger:hover {
+  background-color: var(--danger-color);
+  color: #FFFFFF;
+}
+
+/* 個別メッセージ削除ボタン */
+.btn-delete-single {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: #FEE2E2;
+  color: var(--danger-color);
+  border: 1px solid #FCA5A5;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-delete-single:hover {
+  background: var(--danger-color);
+  color: #FFFFFF;
+}
+
+.ios-guide {
+  background-color: var(--warning-bg);
+  border: 3px solid var(--warning-border);
+  color: var(--warning-text);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.ios-guide h3 {
+  font-size: var(--font-size-large);
+  font-weight: 800;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ios-guide ol {
+  padding-left: 24px;
+  font-weight: 600;
+}
+
+.ios-guide li {
+  margin-bottom: 10px;
+  font-size: 19px;
+}
+
+.ios-icon-badge {
+  display: inline-block;
+  background: #FFFFFF;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid #D97706;
+}
+
+/* 管理画面スタイル */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  font-size: var(--font-size-large);
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.form-control {
+  width: 100%;
+  font-size: var(--font-size-base);
+  padding: 14px;
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  background-color: #FFFFFF;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.2);
+}
+
+textarea.form-control {
+  min-height: 140px;
+  resize: vertical;
+}
+
+.alert {
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  font-weight: bold;
+}
+
+.alert-success {
+  background-color: #DCFCE7;
+  color: #166534;
+  border: 2px solid #86EFAC;
+}
+
+.alert-error {
+  background-color: #FEE2E2;
+  color: #991B1B;
+  border: 2px solid #FCA5A5;
+}

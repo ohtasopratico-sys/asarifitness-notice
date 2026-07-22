@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>お店のお知らせ通知アプリ</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+  <meta name="theme-color" content="#1E40AF">
+</head>
+<body>
+
+  <!-- トップヘッダー -->
+  <header>
+    <h1 id="app-title">📢 お店のお知らせ</h1>
+    <p id="app-subtitle">大切なご案内をスマホにお届けします</p>
+    
+    <!-- モード切り替えスイッチ -->
+    <div class="mode-switch-container">
+      <button id="mode-customer-btn" class="mode-btn active">📱 お客様用画面</button>
+      <button id="mode-admin-btn" class="mode-btn">⚙️ お店（管理者）用画面</button>
+    </div>
+  </header>
+
+  <!-- iOS(iPhone/iPad) 向けのホーム画面追加案内 -->
+  <div id="ios-guide" class="ios-guide" style="display: none;">
+    <h3>📱 iPhoneをご利用の方へ</h3>
+    <p style="margin-bottom: 10px; font-weight: bold;">通知を受け取るには「ホーム画面に追加」が必要です。</p>
+    <ol>
+      <li>画面下部の <span class="ios-icon-badge">共有 ⎋</span> ボタンをタップします</li>
+      <li><strong>「ホーム画面に追加」</strong> を選択します</li>
+      <li>ホーム画面のアイコンから開き直してください</li>
+    </ol>
+  </div>
+
+  <!-- ==================== A. お客様用画面 ==================== -->
+  <main id="customer-view">
+    <!-- 通知登録カード -->
+    <section class="card subscribe-section">
+      <div class="card-title">🔔 通知の受け取り設定</div>
+      <p class="description-text">
+        下のボタンを押すと、お店からの最新メッセージがスマホに通知されます。（個人情報は一切取得しません）
+      </p>
+
+      <button id="subscribe-btn" class="btn-primary">
+        <span class="btn-icon">🔔</span>
+        <span>お知らせを受け取る</span>
+      </button>
+
+      <div id="status-badge" class="status-badge">
+        状態を確認中...
+      </div>
+    </section>
+
+    <!-- 受信メッセージ一覧カード -->
+    <section class="card">
+      <div class="card-title">✉️ 届いているお知らせ一覧</div>
+      <div id="message-container" class="message-list">
+        <p class="empty-text">現在、届いているお知らせはありません。</p>
+      </div>
+    </section>
+  </main>
+
+
+  <!-- ==================== B. お店（管理者）用画面 ==================== -->
+  <main id="admin-view" style="display: none;">
+    <section class="card">
+      <div class="card-title">✉️ 新しいお知らせの作成・送信</div>
+      <p class="description-text">
+        入力したメッセージが登録されているお客様の画面と通知センターに即座に届きます。
+      </p>
+
+      <div id="send-alert" class="alert" style="display: none;"></div>
+
+      <form id="send-form">
+        <div class="form-group">
+          <label for="msg-title">通知のタイトル</label>
+          <input type="text" id="msg-title" class="form-control" placeholder="例: 本日のお買い得情報！" required>
+        </div>
+
+        <div class="form-group">
+          <label for="msg-body">通知の本文</label>
+          <textarea id="msg-body" class="form-control" placeholder="例: 本日はポイント2倍デーです。ぜひご来店ください。" required></textarea>
+        </div>
+
+        <div class="button-group">
+          <button type="submit" id="send-btn" class="btn-primary">
+            <span class="btn-icon">🚀</span>
+            <span>今すぐ通知を送信する</span>
+          </button>
+          
+          <button type="button" id="demo-send-btn" class="btn-secondary">
+            <span class="btn-icon">⏱️</span>
+            <span>5秒後に通知テスト（離れて確認用）</span>
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- 送信履歴一覧 -->
+    <section class="card">
+      <div class="card-title">📋 配信履歴</div>
+      <div id="admin-history-container" class="message-list">
+        <p class="empty-text">配信履歴はありません。</p>
+      </div>
+      <div style="margin-top: 16px; text-align: right;">
+        <button id="clear-history-btn" class="btn-danger">🗑️ 履歴をクリア</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

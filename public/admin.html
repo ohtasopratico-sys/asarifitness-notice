@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理画面 - プッシュ通知配信</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+  <header>
+    <h1>⚙️ 通知配信 管理画面</h1>
+    <p>お客様のスマホへ一斉お知らせを送信します</p>
+  </header>
+
+  <!-- ログインフォーム -->
+  <div id="login-card" class="card">
+    <div class="card-title">🔐 管理者ログイン</div>
+    <div id="login-alert" class="alert alert-error" style="display: none;"></div>
+    
+    <div class="form-group">
+      <label for="admin-password">パスワード</label>
+      <input type="password" id="admin-password" class="form-control" placeholder="パスワードを入力してください">
+    </div>
+
+    <button id="login-btn" class="btn-primary" style="background-color: var(--primary-color);">
+      <span>ログイン</span>
+    </button>
+  </div>
+
+  <!-- 送信メインエリア（ログイン後表示） -->
+  <div id="admin-main" style="display: none;">
+    <section class="card">
+      <div class="card-title">✉️ 新しいお知らせの配信</div>
+      
+      <div id="send-alert" class="alert" style="display: none;"></div>
+
+      <form id="send-form">
+        <div class="form-group">
+          <label for="msg-title">通知のタイトル</label>
+          <input type="text" id="msg-title" class="form-control" placeholder="例: 本日のお買い得情報！" required>
+        </div>
+
+        <div class="form-group">
+          <label for="msg-body">通知の本文</label>
+          <textarea id="msg-body" class="form-control" placeholder="例: 本日はポイント2倍デーです。ぜひご来店ください。" required></textarea>
+        </div>
+
+        <button type="submit" id="send-btn" class="btn-primary">
+          <span class="btn-icon">🚀</span>
+          <span>全員に通知を送信する</span>
+        </button>
+      </form>
+    </section>
+
+    <!-- 送信履歴一覧 -->
+    <section class="card">
+      <div class="card-title">📋 送信履歴</div>
+      <div id="history-container" class="message-list">
+        <p style="text-align: center; color: var(--text-sub);">履歴を読み込み中...</p>
+      </div>
+    </section>
+  </div>
+
+  <script src="/admin.js"></script>
+</body>
+</html>

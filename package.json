@@ -1,0 +1,19 @@
+{
+  "name": "senior-web-push-system",
+  "version": "1.0.0",
+  "description": "外部サービス非依存・完全自前実装のシニア向けWeb Push通知システム",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "generate-vapid": "node generate-vapid.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "sqlite3": "^5.1.7",
+    "web-push": "^3.6.7"
+  }
+}

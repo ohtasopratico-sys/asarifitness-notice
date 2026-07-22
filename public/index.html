@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>お店のお知らせ通知</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/style.css">
+  <meta name="theme-color" content="#1E40AF">
+</head>
+<body>
+
+  <header>
+    <h1>📢 お店のお知らせ</h1>
+    <p>大切なご案内をスマホにお届けします</p>
+  </header>
+
+  <!-- iOS(iPhone/iPad) 向けのホーム画面追加案内 -->
+  <div id="ios-guide" class="ios-guide" style="display: none;">
+    <h3>📱 iPhoneをご利用の方へ</h3>
+    <p style="margin-bottom: 12px; font-weight: bold;">通知を受け取るには「ホーム画面に追加」が必要です。</p>
+    <ol>
+      <li>画面下部（または上部）の <span class="ios-icon-badge">共有ボタン ⎋</span> をタップします</li>
+      <li>メニューから <strong>「ホーム画面に追加」</strong> を選びます</li>
+      <li>ホーム画面に作成されたアイコンから開き直してください</li>
+    </ol>
+  </div>
+
+  <!-- 通知登録カード -->
+  <section class="card subscribe-section">
+    <div class="card-title">🔔 通知の登録</div>
+    <p style="margin-bottom: 20px; color: var(--text-sub);">
+      ボタンを押すと、お店からの最新メッセージがスマホに届くようになります。（個人情報は取得しません）
+    </p>
+
+    <button id="subscribe-btn" class="btn-primary">
+      <span class="btn-icon">🔔</span>
+      <span>お知らせを受け取る</span>
+    </button>
+
+    <div id="status-badge" class="status-badge">
+      状態を確認中...
+    </div>
+  </section>
+
+  <!-- 受信済みメッセージ一覧 -->
+  <section class="card">
+    <div class="card-title">✉️ 届いているお知らせ一覧</div>
+    <div id="message-container" class="message-list">
+      <p style="text-align: center; color: var(--text-sub);">読み込み中...</p>
+    </div>
+  </section>
+
+  <!-- 登録マニュアルへのリンク -->
+  <section class="card" style="text-align:center;">
+    <div class="card-title">📖 登録方法がわからない方へ</div>
+    <p style="margin-bottom:16px;color:var(--text-sub);">iPhone・Androidそれぞれの詳しい手順を画像付きでご案内しています。</p>
+    <a href="/manual.html" style="display:inline-block;background:var(--primary-color);color:#fff;font-size:20px;font-weight:800;padding:16px 28px;border-radius:14px;text-decoration:none;">
+      📱 登録マニュアルを見る
+    </a>
+  </section>
+
+  <script src="/client.js"></script>
+</body>
+</html>

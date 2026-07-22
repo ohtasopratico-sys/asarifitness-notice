@@ -1,0 +1,15 @@
+# Fly.io クラウドデプロイ用 Dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# 静的ファイルと cloud サーバーのみコピー
+COPY public/ ./public/
+COPY server_cloud.py ./server.py
+
+# データ保存ディレクトリ
+RUN mkdir -p /data
+
+EXPOSE 8080
+
+CMD ["python3", "server.py"]

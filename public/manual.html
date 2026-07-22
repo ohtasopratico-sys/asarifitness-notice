@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>お知らせ通知 登録マニュアル</title>
+  <style>
+    :root {
+      --blue: #1E40AF;
+      --green: #16A34A;
+      --orange: #D97706;
+      --bg: #F8FAFC;
+      --card: #FFFFFF;
+      --border: #E2E8F0;
+      --text: #0F172A;
+      --sub: #475569;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "メイリオ", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 18px;
+      line-height: 1.7;
+      padding: 16px;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    header {
+      background: var(--blue);
+      color: #fff;
+      text-align: center;
+      padding: 28px 20px 22px;
+      border-radius: 16px;
+      margin-bottom: 28px;
+      box-shadow: 0 8px 24px rgba(30,64,175,0.2);
+    }
+    header h1 { font-size: 26px; font-weight: 800; margin-bottom: 6px; }
+    header p  { font-size: 17px; opacity: 0.9; }
+
+    /* タブ */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 14px 10px;
+      font-size: 18px;
+      font-weight: 700;
+      border: 3px solid var(--border);
+      border-radius: 12px;
+      background: var(--card);
+      cursor: pointer;
+      transition: all 0.2s;
+      color: var(--sub);
+    }
+    .tab-btn.active {
+      background: var(--blue);
+      color: #fff;
+      border-color: var(--blue);
+    }
+
+    /* コンテンツ */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ステップカード */
+    .step {
+      background: var(--card);
+      border: 2px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+    .step-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--blue);
+      color: #fff;
+      font-size: 20px;
+      font-weight: 900;
+      margin-bottom: 12px;
+    }
+    .step h2 {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--blue);
+      margin-bottom: 10px;
+    }
+    .step p {
+      font-size: 18px;
+      color: var(--sub);
+      margin-bottom: 14px;
+    }
+    .step img {
+      width: 100%;
+      max-width: 300px;
+      border-radius: 16px;
+      display: block;
+      margin: 0 auto;
+      border: 2px solid var(--border);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    /* 注意枠 */
+    .notice {
+      background: #FEF3C7;
+      border: 3px solid #F59E0B;
+      color: #78350F;
+      border-radius: 12px;
+      padding: 16px 20px;
+      font-size: 18px;
+      font-weight: bold;
+      margin: 20px 0;
+    }
+    .notice-icon { font-size: 24px; margin-right: 6px; }
+
+    /* 完了バナー */
+    .done-banner {
+      background: #DCFCE7;
+      border: 3px solid #86EFAC;
+      color: #166534;
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+      font-size: 20px;
+      font-weight: 800;
+      margin-top: 20px;
+    }
+
+    /* 矢印 */
+    .arrow {
+      text-align: center;
+      font-size: 36px;
+      color: var(--blue);
+      margin: -4px 0 4px;
+    }
+
+    .highlight {
+      background: #DBEAFE;
+      color: var(--blue);
+      padding: 2px 10px;
+      border-radius: 6px;
+      font-weight: 800;
+    }
+
+    @media print {
+      .tabs { display: none; }
+      .tab-content { display: block !important; page-break-after: always; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>📱 お知らせ通知 登録マニュアル</h1>
+  <p>スマートフォンでお知らせを受け取る設定方法</p>
+</header>
+
+<!-- タブ切り替え -->
+<div class="tabs">
+  <button class="tab-btn active" id="tab-iphone" onclick="switchTab('iphone')">🍎 iPhone<br>（iOS）</button>
+  <button class="tab-btn" id="tab-android" onclick="switchTab('android')">🤖 Android<br>（Androidスマホ）</button>
+</div>
+
+<!-- ===== iPhone タブ ===== -->
+<div class="tab-content active" id="content-iphone">
+
+  <div class="notice">
+    <span class="notice-icon">⚠️</span>iPhoneの場合は<strong>「ホーム画面に追加」</strong>という操作が必要です。<br>この操作は最初の1回だけです。
+  </div>
+
+  <!-- ステップ1 -->
+  <div class="step">
+    <div class="step-number">1</div>
+    <h2>お店のQRコードをカメラで読み取る</h2>
+    <p>iPhoneのカメラアプリを開いて、店頭のQRコードに向けます。表示されたリンクをタップして <span class="highlight">Safari（ブラウザ）</span> で開きます。</p>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <!-- ステップ2 -->
+  <div class="step">
+    <div class="step-number">2</div>
+    <h2>画面下の「共有」ボタンをタップする</h2>
+    <p>Safariの画面が開いたら、画面の<strong>一番下</strong>にある四角から矢印が出たマーク <span class="highlight">⎋</span> をタップします。</p>
+    <img src="/img_iphone_step1.jpg" alt="Safariの共有ボタンの場所">
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <!-- ステップ3 -->
+  <div class="step">
+    <div class="step-number">3</div>
+    <h2>「ホーム画面に追加」を選ぶ</h2>
+    <p>下からメニューが出てきます。少し下にスクロールして <span class="highlight">「ホーム画面に追加」</span> をタップします。</p>
+    <img src="/img_iphone_step2.jpg" alt="ホーム画面に追加の選択">
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <!-- ステップ4 -->
+  <div class="step">
+    <div class="step-number">4</div>
+    <h2>「追加」をタップする</h2>
+    <p>右上に <span class="highlight">「追加」</span> ボタンが出てきます。タップするとホーム画面にアイコンが作られます。</p>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <!-- ステップ5 -->
+  <div class="step">
+    <div class="step-number">5</div>
+    <h2>ホーム画面のアイコンから開く</h2>
+    <p>ホーム画面に作られたアイコンをタップして開きます。大きな緑色のボタン <span class="highlight">「お知らせを受け取る」</span> をタップします。</p>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <!-- ステップ6 -->
+  <div class="step">
+    <div class="step-number">6</div>
+    <h2>「許可」をタップする</h2>
+    <p>「通知を送信します」という確認が出たら <span class="highlight">「許可」</span> をタップします。</p>
+  </div>
+
+  <div class="done-banner">
+    🎉 設定完了！<br>お店からのお知らせが届くようになりました。
+  </div>
+</div>
+
+<!-- ===== Android タブ ===== -->
+<div class="tab-content" id="content-android">
+
+  <div class="notice">
+    <span class="notice-icon">✅</span>Androidの場合はとても簡単です！<strong>2ステップ</strong>で完了します。
+  </div>
+
+  <!-- ステップ1 -->
+  <div class="step">
+    <div class="step-number">1</div>
+    <h2>お店のQRコードをカメラで読み取る</h2>
+    <p>カメラアプリまたはGoogleレンズでQRコードを読み取ります。表示されたリンクをタップして <span class="highlight">Chrome（ブラウザ）</span> で開きます。</p>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <!-- ステップ2 -->
+  <div class="step">
+    <div class="step-number">2</div>
+    <h2>緑色のボタンをタップする</h2>
+    <p>画面の大きな緑色のボタン <span class="highlight">「お知らせを受け取る」</span> をタップします。</p>
+    <img src="/img_android_step1.jpg" alt="Androidの通知許可ダイアログ">
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <!-- ステップ3 -->
+  <div class="step">
+    <div class="step-number">3</div>
+    <h2>「許可」をタップする</h2>
+    <p>画面上部に「通知を許可しますか？」という確認が出ます。<span class="highlight">「許可」</span> をタップします。</p>
+  </div>
+
+  <div class="done-banner">
+    🎉 設定完了！<br>お店からのお知らせが届くようになりました。
+  </div>
+
+</div>
+
+<script>
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('content-' + tab).classList.add('active');
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: senior-web-push-system
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        value: mailto:admin@example.com
+    disk:
+      name: sqlite-data
+      mountPath: /usr/src/app/data
+      sizeGB: 1

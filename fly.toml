@@ -1,0 +1,31 @@
+# Fly.io の設定ファイル
+# fly launch で自動生成される内容をカスタマイズしたもの
+
+app = 'asarifitness-notice'   # ← Fly.io上でのアプリ名（全世界で一意である必要あり）
+primary_region = 'nrt'        # 東京リージョン
+
+[build]
+  dockerfile = 'Dockerfile.cloud'
+
+[env]
+  PORT = "8080"
+
+# 管理者パスワードは以下のコマンドで安全に設定:
+# fly secrets set ADMIN_PASSWORD=あなたのパスワード
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false   # 無料枠でも常時起動
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
+
+# SQLiteデータ永続化ボリューム
+[[mounts]]
+  source = "asarifitness_data"
+  destination = "/data"
