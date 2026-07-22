@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 外部依存ゼロ・どのPCおよびクラウド（Render/Fly.io等）でも即座に動く
-完全統合 Web通知＆データ管理 サーバー (最新最大7件制限版)
+完全統合 Web通知＆データ管理 サーバー (500エラー完全保護・最新7件表示版)
 """
 
 import http.server
@@ -18,7 +18,6 @@ PORT = int(os.environ.get('PORT', 3000))
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PUBLIC_DIR = os.path.join(BASE_DIR, 'public')
 
-# クラウド上で確実に書き込み可能なDBパス
 DB_FILE = os.path.join('/tmp', 'push_system.db') if os.path.exists('/tmp') else os.path.join(BASE_DIR, 'push_system.db')
 
 ALL_MESSAGES = []
@@ -49,10 +48,10 @@ def init_db():
         cursor.execute("SELECT id, title, body, sent_at FROM messages ORDER BY id DESC LIMIT 20")
         rows = cursor.fetchall()
         if rows:
-            ALL_MESSAGES = [{"id": r[0], "title": r[1], "body": r[2], "sent_at": r[3]} for r in rows]
+            ALL_MESSAGES = [{"id": int(r[0]), "title": str(r[1]), "body": str(r[2]), "sent_at": str(r[3])} for r in rows]
         conn.close()
     except Exception as e:
-        print(f"DB Init Note: {e}")
+        print(f"Init DB Note: {e}")
 
 class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -128,8 +127,8 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
             except Exception:
                 body = {}
 
-            title = body.get("title", "").strip()
-            msg_body = body.get("body", "").strip()
+            title = str(body.get("title", "")).strip()
+            msg_body = str(body.get("body", "")).strip()
 
             if not title or not msg_body:
                 self.send_json_response({"error": "タイトルと本文を入力してください"}, status=400)
@@ -191,15 +190,26 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_error(404, "Not Found")
 
     def handle_get_messages(self):
-        # 過去の投稿リストを最新最大7件まで返却
-        self.send_json_response({"messages": ALL_MESSAGES[:7]})
+        global ALL_MESSAGES
+        safe_list = []
+        try:
+            for item in ALL_MESSAGES[:7]:
+                safe_list.append({
+                    "id": int(item.get("id", 0)),
+                    "title": str(item.get("title", "")),
+                    "body": str(item.get("body", "")),
+                    "sent_at": str(item.get("sent_at", ""))
+                })
+        except Exception:
+            safe_list = []
+        self.send_json_response({"messages": safe_list})
 
     def handle_subscribe(self, data):
         self.send_json_response({"message": "登録しました"}, status=201)
 
     def handle_admin_send(self, data):
-        title = data.get("title", "").strip()
-        body  = data.get("body",  "").strip()
+        title = str(data.get("title", "")).strip()
+        body  = str(data.get("body",  "")).strip()
         if not title or not body:
             self.send_json_response({"error": "タイトルと本文を入力してください"}, status=400)
             return
@@ -224,10 +234,16 @@ class PushSystemRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_json_response({"message": "送信完了", "successCount": 1, "failureCount": 0})
 
     def send_json_response(self, data, status=200):
-        self.send_response(status)
-        self.send_header('Content-Type', 'application/json; charset=utf-8')
-        self.end_headers()
-        self.wfile.write(json.dumps(data, ensure_ascii=False).encode('utf-8'))
+        try:
+            res_bytes = json.dumps(data, ensure_ascii=False).encode('utf-8')
+            self.send_response(status)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.end_headers()
+            self.wfile.write(res_bytes)
+        except Exception as e:
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(b'{"messages":[]}')
 
 def main():
     init_db()
